@@ -1,0 +1,88 @@
+from flask import Blueprint, request
+from flask_restful import Api, Resource
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from ..models import Project, User, AuditLog
+from datetime import datetime
+
+projects_bp = Blueprint('projects', __name__)
+api = Api(projects_bp)
+
+class ProjectList(Resource):
+    def get(self):
+        projects = Project.objects().order_by('-created_at')
+        return [{
+            'id': str(p.id),
+            'title': p.title,
+            'description': p.description,
+            'budget': p.budget,
+            'progress': p.progress,
+            'status': p.status,
+            'coordinates': p.coordinates,
+            'imageUrl': p.imageUrl,
+            'startDate': p.startDate.isoformat() if p.startDate else None,
+            'endDate': p.endDate.isoformat() if p.endDate else None,
+            'created_at': p.created_at.isoformat()
+        } for p in projects], 200
+
+    @jwt_required()
+    def post(self):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if user.role != 'admin':
+            return {'message': 'Unauthorized'}, 403
+            
+        data = request.get_json()
+        # Handle ISO strings for dates
+        if 'startDate' in data and data['startDate']:
+            data['startDate'] = datetime.fromisoformat(data['startDate'].replace('Z', ''))
+        if 'endDate' in data and data['endDate']:
+            data['endDate'] = datetime.fromisoformat(data['endDate'].replace('Z', ''))
+            
+        project = Project(**data)
+        project.save()
+        
+        AuditLog(admin_id=user_id, action='CREATE_PROJECT', target=project.title).save()
+        
+        return {'message': 'Project created', 'id': str(project.id)}, 201
+
+class ProjectDetail(Resource):
+    @jwt_required()
+    def patch(self, project_id):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if user.role != 'admin':
+            return {'message': 'Unauthorized'}, 403
+            
+        data = request.get_json()
+        project = Project.objects(id=project_id).first()
+        if not project:
+            return {'message': 'Project not found'}, 404
+            
+        for key, value in data.items():
+            if hasattr(project, key):
+                if key in ['startDate', 'endDate'] and value:
+                    value = datetime.fromisoformat(value.replace('Z', ''))
+                setattr(project, key, value)
+        
+        project.save()
+        AuditLog(admin_id=user_id, action='UPDATE_PROJECT', target=project.title).save()
+        
+        return {'message': 'Project updated'}, 200
+
+    @jwt_required()
+    def delete(self, project_id):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if user.role != 'admin':
+            return {'message': 'Unauthorized'}, 403
+            
+        project = Project.objects(id=project_id).first()
+        if project:
+            title = project.title
+            project.delete()
+            AuditLog(admin_id=user_id, action='DELETE_PROJECT', target=title).save()
+            
+        return {'message': 'Project deleted'}, 200
+
+api.add_resource(ProjectList, '/')
+api.add_resource(ProjectDetail, '/<string:project_id>')

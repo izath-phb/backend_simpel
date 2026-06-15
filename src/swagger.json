@@ -1,0 +1,1024 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "SIMPEL API (Sistem Pelaporan Monitoring Desa)",
+    "version": "1.0.0",
+    "description": "Dokumentasi RESTful API sistematis untuk capstone project SIMPEL. Backend ini menghubungkan aplikasi mobile Flutter dengan database MongoDB dan portal Web Admin. Sistem ini dilengkapi dengan sistem autentikasi JWT serta sistem verifikasi biometrik berbasis Deep Learning (FaceNet)."
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Server Aktif Saat Ini (Dinamis & Relatif)"
+    },
+    {
+      "url": "http://localhost:5005/api",
+      "description": "Server Lokal (Port 5005)"
+    },
+    {
+      "url": "http://localhost:5000/api",
+      "description": "Server Lokal (Port 5000)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Masukkan token akses JWT Anda. Format: `Bearer <token>`"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "65fc2a382d6b38c2049bf6f8" },
+          "name": { "type": "string", "example": "Budi Santoso" },
+          "email": { "type": "string", "format": "email", "example": "budi@desa.go.id" },
+          "role": { "type": "string", "enum": ["warga", "admin"], "example": "warga" },
+          "rt": { "type": "string", "example": "003" },
+          "rw": { "type": "string", "example": "002" },
+          "photo_url": { "type": "string", "example": "https://lh3.googleusercontent.com/a/abc123xyz" },
+          "is_verified": { "type": "boolean", "example": true },
+          "is_face_registered": { "type": "boolean", "example": true }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "65fc2f562d6b38c2049bf6fc" },
+          "user_id": { "type": "string", "example": "65fc2a382d6b38c2049bf6f8" },
+          "user_name": { "type": "string", "example": "Budi Santoso" },
+          "title": { "type": "string", "example": "Jalan Berlubang di RT 03" },
+          "description": { "type": "string", "example": "Jalanan berlubang parah menghambat akses jalan warga lokal." },
+          "category": { "type": "string", "example": "Infrastruktur" },
+          "coordinates": {
+            "type": "array",
+            "items": { "type": "number" },
+            "example": [-6.2088, 106.8456]
+          },
+          "status": { "type": "string", "enum": ["pending", "verified", "on_progress", "resolved", "rejected"], "example": "pending" },
+          "imageUrl": { "type": "string", "example": "https://storage.googleapis.com/simpel/reports/damage1.jpg" },
+          "afterImageUrl": { "type": "string", "example": null },
+          "adminNote": { "type": "string", "example": null },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5, "example": 4 },
+          "likes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["65fc2a382d6b38c2049bf6f8"]
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "example": "1710984024.123" },
+                "user_id": { "type": "string", "example": "65fc2a382d6b38c2049bf6f8" },
+                "user_name": { "type": "string", "example": "Budi Santoso" },
+                "user_photo_url": { "type": "string", "example": "https://lh3.googleusercontent.com/a/abc" },
+                "content": { "type": "string", "example": "Terima kasih, mohon segera ditindaklanjuti." },
+                "created_at": { "type": "string", "format": "date-time", "example": "2026-05-19T20:00:00Z" }
+              }
+            }
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": { "type": "string", "example": "pending" },
+                "note": { "type": "string", "example": "Laporan berhasil dikirim oleh warga." },
+                "timestamp": { "type": "string", "format": "date-time", "example": "2026-05-19T20:00:00Z" }
+              }
+            }
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "65fc3b122d6b38c2049bf7a2" },
+          "title": { "type": "string", "example": "Pembangunan Jembatan Desa" },
+          "description": { "type": "string", "example": "Pembangunan jembatan penghubung dusun A dan dusun B." },
+          "budget": { "type": "number", "example": 150000000 },
+          "progress": { "type": "integer", "example": 45 },
+          "status": { "type": "string", "example": "Sedang Dikerjakan" },
+          "coordinates": {
+            "type": "array",
+            "items": { "type": "number" },
+            "example": [-6.209, 106.846]
+          },
+          "imageUrl": { "type": "string", "example": "https://storage.googleapis.com/simpel/projects/bridge.jpg" },
+          "startDate": { "type": "string", "format": "date-time", "example": "2026-05-01T00:00:00Z" },
+          "endDate": { "type": "string", "format": "date-time", "example": "2026-08-31T00:00:00Z" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Registrasi Pengguna Baru (Warga / Admin)",
+        "description": "Mendaftarkan user baru ke sistem SIMPEL. Secara default, warga yang baru terdaftar memiliki status aktif.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string", "example": "Budi Santoso" },
+                  "email": { "type": "string", "format": "email", "example": "budi@desa.go.id" },
+                  "password": { "type": "string", "format": "password", "example": "Rahasia123!" },
+                  "role": { "type": "string", "default": "warga", "example": "warga" },
+                  "rt": { "type": "string", "example": "003" },
+                  "rw": { "type": "string", "example": "002" },
+                  "photo_url": { "type": "string", "example": "https://images.unsplash.com/avatar.jpg" }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "User created successfully",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "User created successfully and is now active." }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "User already exists",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "User already exists" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Login Berbasis Kredensial (Email & Password)",
+        "description": "Login menggunakan email dan password untuk mendapatkan token JWT guna otorisasi API.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "budi@desa.go.id" },
+                  "password": { "type": "string", "format": "password", "example": "Rahasia123!" }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Login sukses",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "access_token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+                      "user": { "$ref": "#/components/schemas/User" }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Kredensial tidak valid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Invalid credentials" }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Akun diblokir oleh admin",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Your account has been blocked. Please contact admin." }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google-login": {
+      "post": {
+        "tags": ["Autentikasi"],
+        "summary": "Login Menggunakan Google Sign-In",
+        "description": "Melakukan registrasi / login otomatis melalui data autentikasi Google Firebase dari aplikasi mobile.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "budi@desa.go.id" },
+                  "name": { "type": "string", "example": "Budi Santoso" },
+                  "photo_url": { "type": "string", "example": "https://lh3.googleusercontent.com/a/abc" },
+                  "role": { "type": "string", "default": "warga", "example": "warga" }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Login Google Sukses",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "access_token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+                      "user": { "$ref": "#/components/schemas/User" }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Akses Ditolak (Format domain admin salah, atau diblokir)",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Akses ditolak. Email tidak terdaftar sebagai Admin." }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-face": {
+      "post": {
+        "tags": ["Sistem Cerdas (FaceNet)"],
+        "summary": "Registrasi & Verifikasi Wajah Biometrik (FaceNet Model)",
+        "description": "Menerima input base64 gambar wajah warga dari kamera aplikasi mobile Flutter. Jika warga belum merekam wajah (`is_face_registered=false`), maka endpoint akan memproses ini sebagai mode REGISTRASI wajah dan mengekstrak serta menyimpan vektor embedding 128-dimensi ke MongoDB. Jika sudah pernah terdaftar, sistem akan memproses perbandingan kosinus (Cosine Similarity) di backend untuk VERIFIKASI kecocokan wajah warga secara real-time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "face_image"],
+                "properties": {
+                  "user_id": { "type": "string", "description": "ID MongoDB User", "example": "65fc2a382d6b38c2049bf6f8" },
+                  "face_image": { "type": "string", "description": "MIME Base64 dari gambar JPG/PNG", "example": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD..." }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Operasi registrasi atau verifikasi biometrik sukses",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "status": { "type": "string", "example": "success" },
+                      "verified": { "type": "boolean", "example": true },
+                      "mode": { "type": "string", "example": "verification" },
+                      "confidence": { "type": "number", "example": 0.957 },
+                      "message": { "type": "string", "example": "Verifikasi wajah berhasil." },
+                      "biometrics": {
+                        "type": "object",
+                        "properties": {
+                          "landmarks_detected": { "type": "integer", "example": 68 },
+                          "cosine_distance": { "type": "number", "example": 0.125 },
+                          "threshold": { "type": "number", "example": 0.4 },
+                          "processing_time_ms": { "type": "integer", "example": 820 },
+                          "model_version": { "type": "string", "example": "FaceNet-InceptionResNetV1" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Pemrosesan Computer Vision gagal (Wajah tidak terdeteksi pada gambar)",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "status": { "type": "string", "example": "failed" },
+                      "verified": { "type": "boolean", "example": false },
+                      "confidence": { "type": "number", "example": 0 },
+                      "message": { "type": "string", "example": "Wajah tidak terdeteksi: Face could not be detected. Please confirm that the picture is a face photo." }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/users": {
+      "get": {
+        "tags": ["Manajemen Pengguna (Admin)"],
+        "summary": "Ambil Daftar Semua Warga (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Daftar warga berhasil didapatkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/User" }
+                }
+              }
+            }
+          },
+          "403": { "description": "Unauthorized / Bukan Admin" }
+        }
+      }
+    },
+    "/auth/users/{user_id}": {
+      "patch": {
+        "tags": ["Manajemen Pengguna (Admin)"],
+        "summary": "Aktivasi / Blokir Status Warga (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc2a382d6b38c2049bf6f8"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "is_verified": { "type": "boolean", "example": false }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Status warga berhasil diubah",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "User status updated" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/": {
+      "get": {
+        "tags": ["Laporan Keluhan Warga"],
+        "summary": "Ambil Daftar Semua Laporan",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "Gunakan `my` untuk filter hanya laporan milik saya sendiri (warga). Default: `all`",
+            "required": false,
+            "schema": { "type": "string", "example": "all" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar laporan warga",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Report" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Laporan Keluhan Warga"],
+        "summary": "Buat Laporan Baru (Oleh Warga)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description", "category", "coordinates"],
+                "properties": {
+                  "title": { "type": "string", "example": "Jalan Berlubang di RT 03" },
+                  "description": { "type": "string", "example": "Jalanan berlubang parah menghambat jalan warga." },
+                  "category": { "type": "string", "example": "Infrastruktur" },
+                  "coordinates": {
+                    "type": "array",
+                    "items": { "type": "number" },
+                    "example": [-6.2088, 106.8456]
+                  },
+                  "imageUrl": { "type": "string", "example": "https://storage.googleapis.com/simpel/reports/damage1.jpg" }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Laporan berhasil terkirim",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Report submitted successfully" },
+                      "id": { "type": "string", "example": "65fc2f562d6b38c2049bf6fc" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{report_id}": {
+      "get": {
+        "tags": ["Laporan Keluhan Warga"],
+        "summary": "Ambil Detail Informasi Laporan",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc2f562d6b38c2049bf6fc"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Objek detail laporan",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Report" }
+              }
+            }
+          },
+          "404": { "description": "Laporan tidak ditemukan" }
+        }
+      },
+      "patch": {
+        "tags": ["Laporan Keluhan Warga"],
+        "summary": "Update Status Tindak Lanjut Laporan (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc2f562d6b38c2049bf6fc"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["verified", "on_progress", "resolved", "rejected"], "example": "on_progress" },
+                  "note": { "type": "string", "description": "Catatan perubahan status", "example": "Laporan diverifikasi, petugas dikerahkan ke lokasi." },
+                  "adminNote": { "type": "string", "example": "Petugas lapangan dari PU Desa sedang menuju lokasi." },
+                  "afterImageUrl": { "type": "string", "example": "https://storage.googleapis.com/simpel/reports/resolved.jpg" }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Laporan berhasil diperbarui",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Report updated successfully" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{report_id}/like": {
+      "post": {
+        "tags": ["Laporan Keluhan Warga"],
+        "summary": "Toggle Like Laporan Keluhan",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc2f562d6b38c2049bf6fc"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status like berhasil di-toggle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Liked" },
+                    "is_liked": { "type": "boolean", "example": true },
+                    "likes_count": { "type": "integer", "example": 5 },
+                    "likes": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "example": ["65fc2a382d6b38c2049bf6f8"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{report_id}/comments": {
+      "post": {
+        "tags": ["Laporan Keluhan Warga"],
+        "summary": "Kirim Komentar Baru ke Laporan Warga",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc2f562d6b38c2049bf6fc"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": {
+                  "content": { "type": "string", "example": "Mohon ditindaklanjuti, sangat menghambat perjalanan warga." }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Komentar berhasil ditambahkan",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Comment added successfully" },
+                      "comment": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string", "example": "1710984024.123" },
+                          "user_id": { "type": "string", "example": "65fc2a382d6b38c2049bf6f8" },
+                          "user_name": { "type": "string", "example": "Budi Santoso" },
+                          "user_photo_url": { "type": "string", "example": "https://lh3.googleusercontent.com/abc" },
+                          "content": { "type": "string", "example": "Mohon ditindaklanjuti, sangat menghambat perjalanan warga." },
+                          "created_at": { "type": "string", "format": "date-time", "example": "2026-05-19T20:00:00Z" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/": {
+      "get": {
+        "tags": ["Proyek Pembangunan Desa"],
+        "summary": "Ambil Semua Daftar Proyek Pembangunan Desa",
+        "responses": {
+          "200": {
+            "description": "Daftar proyek pembangunan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Project" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Proyek Pembangunan Desa"],
+        "summary": "Tambah Proyek Baru (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description", "budget"],
+                "properties": {
+                  "title": { "type": "string", "example": "Pembangunan Jembatan Dusun" },
+                  "description": { "type": "string", "example": "Proyek perbaikan jembatan gantung antar dusun." },
+                  "budget": { "type": "number", "example": 125000000 },
+                  "progress": { "type": "integer", "default": 0, "example": 10 },
+                  "status": { "type": "string", "example": "Tahap Perencanaan" },
+                  "coordinates": {
+                    "type": "array",
+                    "items": { "type": "number" },
+                    "example": [-6.211, 106.848]
+                  },
+                  "imageUrl": { "type": "string", "example": "https://images.unsplash.com/bridge.jpg" },
+                  "startDate": { "type": "string", "format": "date-time", "example": "2026-06-01T00:00:00Z" },
+                  "endDate": { "type": "string", "format": "date-time", "example": "2026-09-01T00:00:00Z" }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Proyek berhasil dibuat",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Project created" },
+                      "id": { "type": "string", "example": "65fc3b122d6b38c2049bf7a2" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}": {
+      "patch": {
+        "tags": ["Proyek Pembangunan Desa"],
+        "summary": "Update Progres / Detail Proyek (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc3b122d6b38c2049bf7a2"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "progress": { "type": "integer", "example": 80 },
+                  "status": { "type": "string", "example": "Tahap Konstruksi Akhir" },
+                  "budget": { "type": "number", "example": 128000000 }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Proyek berhasil diperbarui",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Project updated" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Proyek Pembangunan Desa"],
+        "summary": "Hapus Proyek Pembangunan (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc3b122d6b38c2049bf7a2"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Proyek berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Project deleted" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/stats": {
+      "get": {
+        "tags": ["Dashboard & Statistik"],
+        "summary": "Ambil Statistik Konsol Web Admin (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Statistik web admin sukses diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_reports": { "type": "integer", "example": 15 },
+                    "pending_reports": { "type": "integer", "example": 4 },
+                    "verified_reports": { "type": "integer", "example": 3 },
+                    "on_progress_reports": { "type": "integer", "example": 5 },
+                    "resolved_reports": { "type": "integer", "example": 3 },
+                    "reports_today": { "type": "integer", "example": 2 },
+                    "total_projects": { "type": "integer", "example": 4 },
+                    "total_budget": { "type": "number", "example": 420000000 },
+                    "avg_progress": { "type": "number", "example": 62.5 },
+                    "blocked_users": { "type": "integer", "example": 1 },
+                    "chart_data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "month": { "type": "string", "example": "May" },
+                          "count": { "type": "integer", "example": 8 }
+                        }
+                      }
+                    },
+                    "recent_logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "admin": { "type": "string", "example": "Admin Desa" },
+                          "action": { "type": "string", "example": "UPDATE_REPORT_STATUS" },
+                          "target": { "type": "string", "example": "Jalan Berlubang di RT 03" },
+                          "timestamp": { "type": "string", "format": "date-time", "example": "2026-05-19T20:10:00Z" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/user-stats": {
+      "get": {
+        "tags": ["Dashboard & Statistik"],
+        "summary": "Ambil Ringkasan Laporan Saya (Untuk Warga)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Statistik ringkasan laporan personal warga",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_reports": { "type": "integer", "example": 3 },
+                    "pending_reports": { "type": "integer", "example": 1 },
+                    "verified_reports": { "type": "integer", "example": 0 },
+                    "on_progress_reports": { "type": "integer", "example": 1 },
+                    "resolved_reports": { "type": "integer", "example": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/announcements/": {
+      "get": {
+        "tags": ["Pengumuman & Berita"],
+        "summary": "Ambil Daftar Semua Berita / Pengumuman Desa",
+        "responses": {
+          "200": {
+            "description": "Daftar pengumuman aktif",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "example": "65fc4a102d6b38c2049bf8b1" },
+                      "title": { "type": "string", "example": "Gotong Royong Kebersihan Desa" },
+                      "content": { "type": "string", "example": "Akan dilaksanakan gotong royong massal menyambut musim hujan pada hari Minggu." },
+                      "imageUrl": { "type": "string", "example": "https://storage.googleapis.com/simpel/banners/gotong.jpg" },
+                      "authorName": { "type": "string", "example": "Kepala Desa" },
+                      "is_carousel": { "type": "boolean", "example": true },
+                      "created_at": { "type": "string", "format": "date-time", "example": "2026-05-18T10:00:00Z" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Pengumuman & Berita"],
+        "summary": "Buat Pengumuman Baru (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "content"],
+                "properties": {
+                  "title": { "type": "string", "example": "Bantuan Sosial Desa Mandiri" },
+                  "content": { "type": "string", "example": "Penyaluran bantuan sosial tahap 3 akan dibagikan di Balai Desa mulai jam 09.00 WIB." },
+                  "imageUrl": { "type": "string", "example": "https://storage.googleapis.com/simpel/banners/bansos.jpg" },
+                  "is_carousel": { "type": "boolean", "default": false, "example": true }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Pengumuman berhasil dibuat",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Announcement created" },
+                      "id": { "type": "string", "example": "65fc4a102d6b38c2049bf8b1" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/announcements/{ann_id}": {
+      "patch": {
+        "tags": ["Pengumuman & Berita"],
+        "summary": "Edit Pengumuman Desa (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "ann_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc4a102d6b38c2049bf8b1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string", "example": "Bantuan Sosial Tahap 3" },
+                  "is_carousel": { "type": "boolean", "example": false }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Pengumuman berhasil diperbarui",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "string", "example": "Announcement updated" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Pengumuman & Berita"],
+        "summary": "Hapus Pengumuman Desa (Hanya Admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "ann_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "65fc4a102d6b38c2049bf8b1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pengumuman berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Deleted" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

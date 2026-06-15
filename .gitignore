@@ -1,0 +1,21 @@
+firebase-service-account.json
+# Python
+venv/
+.venv/
+env/
+
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+
+# Environment
+.env
