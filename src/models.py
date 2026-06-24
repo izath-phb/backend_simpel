@@ -80,6 +80,7 @@ class Project(db.Document):
     imageUrl = db.StringField()
     startDate = db.DateTimeField()
     endDate = db.DateTimeField()
+    followers = db.ListField(db.ReferenceField('User'))
     created_at = db.DateTimeField(default=datetime.utcnow)
 
 class Announcement(db.Document):

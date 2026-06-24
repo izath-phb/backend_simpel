@@ -23,39 +23,71 @@ class ReportList(Resource):
             else:
                 reports = Report.objects().order_by('-created_at')
             
-        return [{
-            'id': str(r.id),
-            'user_id': str(r.user_id.id) if r.user_id else '',
-            'user_name': User.objects(id=r.user_id.id).first().name if r.user_id and User.objects(id=r.user_id.id).first() else 'Warga',
-            'title': r.title,
-            'description': r.description,
-            'category': r.category,
-            'coordinates': r.coordinates,
-            'status': r.status,
-            'imageUrl': r.imageUrl,
-            'afterImageUrl': r.afterImageUrl,
-            'adminNote': r.adminNote,
-            'rating': r.rating,
-            'created_at': r.created_at.isoformat(),
-            'likes': [str(u.id) for u in r.likes] if r.likes else [],
-            'comments': [{
-                'id': str(c.created_at.timestamp()),
-                'user_id': str(c.user_id.id) if c.user_id else '',
-                'user_name': c.user_name,
-                'user_photo_url': c.user_photo_url or '',
-                'content': c.content,
-                'created_at': c.created_at.isoformat()
-            } for c in r.comments] if r.comments else [],
-            'logs': [{
-                'status': l.status,
-                'note': l.note,
-                'timestamp': l.timestamp.isoformat()
-            } for l in r.logs]
-        } for r in reports], 200
+        result = []
+        for r in reports:
+            try:
+                user_id_str = ''
+                user_name = 'Warga'
+                
+                try:
+                    if r.user_id:
+                        uid = getattr(r.user_id, 'id', r.user_id)
+                        user_id_str = str(uid)
+                        found_user = User.objects(id=uid).first()
+                        if found_user:
+                            user_name = found_user.name
+                except Exception:
+                    pass
+                
+                try:
+                    likes_list = [str(getattr(u, 'id', u)) for u in r.likes] if r.likes else []
+                except Exception:
+                    likes_list = []
+                    
+                try:
+                    comments_list = [{
+                        'id': str(c.created_at.timestamp()),
+                        'user_id': str(getattr(c.user_id, 'id', c.user_id)) if c.user_id else '',
+                        'user_name': c.user_name,
+                        'user_photo_url': c.user_photo_url or '',
+                        'content': c.content,
+                        'created_at': c.created_at.isoformat()
+                    } for c in r.comments] if r.comments else []
+                except Exception:
+                    comments_list = []
+
+                result.append({
+                    'id': str(r.id),
+                    'user_id': user_id_str,
+                    'user_name': user_name,
+                    'title': r.title,
+                    'description': r.description,
+                    'category': r.category,
+                    'coordinates': r.coordinates,
+                    'status': r.status,
+                    'imageUrl': r.imageUrl,
+                    'afterImageUrl': r.afterImageUrl,
+                    'adminNote': r.adminNote,
+                    'rating': r.rating,
+                    'created_at': r.created_at.isoformat(),
+                    'likes': likes_list,
+                    'comments': comments_list,
+                    'logs': [{
+                        'status': l.status,
+                        'note': l.note,
+                        'timestamp': l.timestamp.isoformat()
+                    } for l in r.logs] if hasattr(r, 'logs') and r.logs else []
+                })
+            except Exception as e:
+                print(f"Skipping malformed report {r.id}: {e}", flush=True)
+                continue
+            
+        return result, 200
 
     @jwt_required()
     def post(self):
         user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
         data = request.get_json()
         
         report = Report(
@@ -64,7 +96,7 @@ class ReportList(Resource):
             category=data.get('category'),
             coordinates=data.get('coordinates'), # [lat, lng]
             imageUrl=data.get('imageUrl'),
-            user_id=user_id
+            user_id=user
         )
         # Initial Log
         report.logs.append(ReportLog(status='pending', note='Laporan berhasil dikirim oleh warga.'))
@@ -75,36 +107,41 @@ class ReportList(Resource):
 class ReportDetail(Resource):
     @jwt_required()
     def get(self, report_id):
-        report = Report.objects(id=report_id).first()
-        if not report:
-            return {'message': 'Report not found'}, 404
-        return {
-            'id': str(report.id),
-            'user_id': str(report.user_id.id) if report.user_id else '',
-            'user_name': User.objects(id=report.user_id.id).first().name if report.user_id and User.objects(id=report.user_id.id).first() else 'Warga',
-            'title': report.title,
-            'description': report.description,
-            'category': report.category,
-            'coordinates': report.coordinates,
-            'status': report.status,
-            'imageUrl': report.imageUrl,
-            'afterImageUrl': report.afterImageUrl,
-            'adminNote': report.adminNote,
-            'likes': [str(u.id) for u in report.likes] if report.likes else [],
-            'comments': [{
-                'id': str(c.created_at.timestamp()),
-                'user_id': str(c.user_id.id) if c.user_id else '',
-                'user_name': c.user_name,
-                'user_photo_url': c.user_photo_url or '',
-                'content': c.content,
-                'created_at': c.created_at.isoformat()
-            } for c in report.comments] if report.comments else [],
-            'logs': [{
-                'status': l.status,
-                'note': l.note,
-                'timestamp': l.timestamp.isoformat()
-            } for l in report.logs]
-        }, 200
+        try:
+            report = Report.objects(id=report_id).first()
+            if not report:
+                return {'message': 'Report not found'}, 404
+            return {
+                'id': str(report.id),
+                'user_id': str(getattr(report.user_id, 'id', report.user_id)) if report.user_id else '',
+                'user_name': User.objects(id=getattr(report.user_id, 'id', report.user_id)).first().name if report.user_id and User.objects(id=getattr(report.user_id, 'id', report.user_id)).first() else 'Warga',
+                'title': report.title,
+                'description': report.description,
+                'category': report.category,
+                'coordinates': report.coordinates,
+                'status': report.status,
+                'imageUrl': report.imageUrl,
+                'afterImageUrl': report.afterImageUrl,
+                'adminNote': report.adminNote,
+                'rating': report.rating,
+                'likes': [str(getattr(u, 'id', u)) for u in report.likes] if hasattr(report, 'likes') and report.likes else [],
+                'comments': [{
+                    'id': str(c.created_at.timestamp()),
+                    'user_id': str(getattr(c.user_id, 'id', c.user_id)) if c.user_id else '',
+                    'user_name': c.user_name,
+                    'user_photo_url': getattr(c, 'user_photo_url', ''),
+                    'content': c.content,
+                    'created_at': c.created_at.isoformat()
+                } for c in report.comments] if hasattr(report, 'comments') and report.comments else [],
+                'logs': [{
+                    'status': l.status,
+                    'note': l.note,
+                    'timestamp': l.timestamp.isoformat()
+                } for l in report.logs] if hasattr(report, 'logs') and report.logs else []
+            }, 200
+        except Exception as e:
+            print(f"Error fetching report detail: {e}", flush=True)
+            return {'message': 'Internal Server Error', 'error': str(e)}, 500
 
     @jwt_required()
     def patch(self, report_id):

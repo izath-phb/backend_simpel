@@ -21,6 +21,7 @@ class ProjectList(Resource):
             'imageUrl': p.imageUrl,
             'startDate': p.startDate.isoformat() if p.startDate else None,
             'endDate': p.endDate.isoformat() if p.endDate else None,
+            'followers': [str(u.id) for u in p.followers] if p.followers else [],
             'created_at': p.created_at.isoformat()
         } for p in projects], 200
 
@@ -84,5 +85,39 @@ class ProjectDetail(Resource):
             
         return {'message': 'Project deleted'}, 200
 
+class ProjectFollowToggle(Resource):
+    @jwt_required()
+    def post(self, project_id):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if not user:
+            return {'message': 'User not found'}, 404
+            
+        project = Project.objects(id=project_id).first()
+        if not project:
+            return {'message': 'Project not found'}, 404
+            
+        is_following = False
+        followers_list = [str(u.id) for u in project.followers]
+        if str(user.id) in followers_list:
+            for u in project.followers:
+                if str(u.id) == str(user.id):
+                    project.followers.remove(u)
+                    break
+            message = 'Unfollowed'
+        else:
+            project.followers.append(user)
+            message = 'Followed'
+            is_following = True
+            
+        project.save()
+        return {
+            'message': message,
+            'is_following': is_following,
+            'followers_count': len(project.followers),
+            'followers': [str(u.id) for u in project.followers]
+        }, 200
+
 api.add_resource(ProjectList, '/')
 api.add_resource(ProjectDetail, '/<string:project_id>')
+api.add_resource(ProjectFollowToggle, '/<string:project_id>/follow')

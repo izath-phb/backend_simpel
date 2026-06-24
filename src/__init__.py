@@ -26,12 +26,17 @@ def create_app():
     from .routes.projects import projects_bp
     from .routes.dashboard import dashboard_bp
     from .routes.announcements import announcements_bp
+    from .routes.upload import upload_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(reports_bp, url_prefix='/api/reports')
     app.register_blueprint(projects_bp, url_prefix='/api/projects')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(announcements_bp, url_prefix='/api/announcements')
+    app.register_blueprint(upload_bp, url_prefix='/api/upload')
+    
+    # Ensure static uploads dir exists
+    os.makedirs(os.path.join(app.root_path, 'static', 'uploads'), exist_ok=True)
 
     @app.before_request
     def log_request_info():
