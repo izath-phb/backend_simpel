@@ -27,6 +27,7 @@ def create_app():
     from .routes.dashboard import dashboard_bp
     from .routes.announcements import announcements_bp
     from .routes.upload import upload_bp
+    from .routes.chat import chat_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(reports_bp, url_prefix='/api/reports')
@@ -34,6 +35,7 @@ def create_app():
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(announcements_bp, url_prefix='/api/announcements')
     app.register_blueprint(upload_bp, url_prefix='/api/upload')
+    app.register_blueprint(chat_bp, url_prefix='/api/chat')
     
     # Ensure static uploads dir exists
     os.makedirs(os.path.join(app.root_path, 'static', 'uploads'), exist_ok=True)

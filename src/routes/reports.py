@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models import Report, User, ReportLog, AuditLog, Comment
+from ..models import Report, User, ReportLog, AuditLog, Comment, UserActivityLog
 from datetime import datetime
 
 reports_bp = Blueprint('reports', __name__)
@@ -39,23 +39,30 @@ class ReportList(Resource):
                 except Exception:
                     pass
                 
-                try:
-                    likes_list = [str(getattr(u, 'id', u)) for u in r.likes] if r.likes else []
-                except Exception:
-                    likes_list = []
-                    
-                try:
-                    comments_list = [{
-                        'id': str(c.created_at.timestamp()),
-                        'user_id': str(getattr(c.user_id, 'id', c.user_id)) if c.user_id else '',
-                        'user_name': c.user_name,
-                        'user_photo_url': c.user_photo_url or '',
-                        'content': c.content,
-                        'created_at': c.created_at.isoformat()
-                    } for c in r.comments] if r.comments else []
-                except Exception:
-                    comments_list = []
-
+                likes_list = []
+                if hasattr(r, 'likes') and r.likes:
+                    for u in r.likes:
+                        try:
+                            likes_list.append(str(getattr(u, 'id', u)))
+                        except Exception:
+                            pass
+                            
+                comments_list = []
+                if hasattr(r, 'comments') and r.comments:
+                    for c in r.comments:
+                        try:
+                            c_user_id = str(getattr(c.user_id, 'id', c.user_id)) if c.user_id else ''
+                        except Exception:
+                            c_user_id = ''
+                            
+                        comments_list.append({
+                            'id': str(c.created_at.timestamp()),
+                            'user_id': c_user_id,
+                            'user_name': c.user_name,
+                            'user_photo_url': c.user_photo_url or '',
+                            'content': c.content,
+                            'created_at': c.created_at.isoformat()
+                        })
                 result.append({
                     'id': str(r.id),
                     'user_id': user_id_str,
@@ -102,7 +109,9 @@ class ReportList(Resource):
         report.logs.append(ReportLog(status='pending', note='Laporan berhasil dikirim oleh warga.'))
         report.save()
         
-        return {'message': 'Report submitted successfully', 'id': str(report.id)}, 201
+        UserActivityLog(user_id=user.id, user_name=user.name, action='CREATE_REPORT', target=report.title).save()
+        
+        return {'message': 'Report created successfully', 'id': str(report.id)}, 201
 
 class ReportDetail(Resource):
     @jwt_required()
@@ -111,10 +120,42 @@ class ReportDetail(Resource):
             report = Report.objects(id=report_id).first()
             if not report:
                 return {'message': 'Report not found'}, 404
+                
+            try:
+                user_id_str = str(getattr(report.user_id, 'id', report.user_id)) if report.user_id else ''
+                user_name = User.objects(id=user_id_str).first().name if user_id_str and User.objects(id=user_id_str).first() else 'Warga'
+            except Exception:
+                user_id_str = ''
+                user_name = 'Warga'
+                
+            likes_list = []
+            if hasattr(report, 'likes') and report.likes:
+                for u in report.likes:
+                    try:
+                        likes_list.append(str(getattr(u, 'id', u)))
+                    except Exception:
+                        pass
+                        
+            comments_list = []
+            if hasattr(report, 'comments') and report.comments:
+                for c in report.comments:
+                    try:
+                        c_user_id = str(getattr(c.user_id, 'id', c.user_id)) if c.user_id else ''
+                    except Exception:
+                        c_user_id = ''
+                    comments_list.append({
+                        'id': str(c.created_at.timestamp()),
+                        'user_id': c_user_id,
+                        'user_name': c.user_name,
+                        'user_photo_url': getattr(c, 'user_photo_url', ''),
+                        'content': c.content,
+                        'created_at': c.created_at.isoformat()
+                    })
+
             return {
                 'id': str(report.id),
-                'user_id': str(getattr(report.user_id, 'id', report.user_id)) if report.user_id else '',
-                'user_name': User.objects(id=getattr(report.user_id, 'id', report.user_id)).first().name if report.user_id and User.objects(id=getattr(report.user_id, 'id', report.user_id)).first() else 'Warga',
+                'user_id': user_id_str,
+                'user_name': user_name,
                 'title': report.title,
                 'description': report.description,
                 'category': report.category,
@@ -124,15 +165,8 @@ class ReportDetail(Resource):
                 'afterImageUrl': report.afterImageUrl,
                 'adminNote': report.adminNote,
                 'rating': report.rating,
-                'likes': [str(getattr(u, 'id', u)) for u in report.likes] if hasattr(report, 'likes') and report.likes else [],
-                'comments': [{
-                    'id': str(c.created_at.timestamp()),
-                    'user_id': str(getattr(c.user_id, 'id', c.user_id)) if c.user_id else '',
-                    'user_name': c.user_name,
-                    'user_photo_url': getattr(c, 'user_photo_url', ''),
-                    'content': c.content,
-                    'created_at': c.created_at.isoformat()
-                } for c in report.comments] if hasattr(report, 'comments') and report.comments else [],
+                'likes': likes_list,
+                'comments': comments_list,
                 'logs': [{
                     'status': l.status,
                     'note': l.note,
@@ -180,6 +214,26 @@ class ReportDetail(Resource):
         
         return {'message': 'Report updated successfully'}, 200
 
+    @jwt_required()
+    def delete(self, report_id):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        
+        if user.role != 'admin':
+            return {'message': 'Unauthorized'}, 403
+            
+        report = Report.objects(id=report_id).first()
+        if not report:
+            return {'message': 'Report not found'}, 404
+            
+        report_title = report.title
+        report.delete()
+        
+        # Audit Log
+        AuditLog(admin_id=user_id, action='DELETE_SPAM_REPORT', target=report_title).save()
+        
+        return {'message': 'Report deleted successfully'}, 200
+
 class ReportLikeToggle(Resource):
     @jwt_required()
     def post(self, report_id):
@@ -204,6 +258,7 @@ class ReportLikeToggle(Resource):
             message = 'Unliked'
         else:
             report.likes.append(user)
+            UserActivityLog(user_id=user.id, user_name=user.name, action='LIKE_REPORT', target=report.title).save()
             message = 'Liked'
             is_liked = True
             
@@ -241,6 +296,8 @@ class ReportComment(Resource):
         )
         report.comments.append(comment)
         report.save()
+        
+        UserActivityLog(user_id=user.id, user_name=user.name, action='COMMENT_REPORT', target=report.title).save()
         
         return {
             'message': 'Comment added successfully',

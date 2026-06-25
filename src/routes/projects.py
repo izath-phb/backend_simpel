@@ -10,20 +10,31 @@ api = Api(projects_bp)
 class ProjectList(Resource):
     def get(self):
         projects = Project.objects().order_by('-created_at')
-        return [{
-            'id': str(p.id),
-            'title': p.title,
-            'description': p.description,
-            'budget': p.budget,
-            'progress': p.progress,
-            'status': p.status,
-            'coordinates': p.coordinates,
-            'imageUrl': p.imageUrl,
-            'startDate': p.startDate.isoformat() if p.startDate else None,
-            'endDate': p.endDate.isoformat() if p.endDate else None,
-            'followers': [str(u.id) for u in p.followers] if p.followers else [],
-            'created_at': p.created_at.isoformat()
-        } for p in projects], 200
+        result = []
+        for p in projects:
+            followers_list = []
+            if p.followers:
+                for u in p.followers:
+                    try:
+                        followers_list.append(str(getattr(u, 'id', u)))
+                    except Exception:
+                        pass
+            
+            result.append({
+                'id': str(p.id),
+                'title': p.title,
+                'description': p.description,
+                'budget': p.budget,
+                'progress': p.progress,
+                'status': p.status,
+                'coordinates': p.coordinates,
+                'imageUrl': p.imageUrl,
+                'startDate': p.startDate.isoformat() if p.startDate else None,
+                'endDate': p.endDate.isoformat() if p.endDate else None,
+                'followers': followers_list,
+                'created_at': p.created_at.isoformat()
+            })
+        return result, 200
 
     @jwt_required()
     def post(self):
@@ -111,11 +122,20 @@ class ProjectFollowToggle(Resource):
             is_following = True
             
         project.save()
+        
+        followers_list = []
+        if project.followers:
+            for u in project.followers:
+                try:
+                    followers_list.append(str(getattr(u, 'id', u)))
+                except Exception:
+                    pass
+                    
         return {
             'message': message,
             'is_following': is_following,
-            'followers_count': len(project.followers),
-            'followers': [str(u.id) for u in project.followers]
+            'followers_count': len(followers_list),
+            'followers': followers_list
         }, 200
 
 api.add_resource(ProjectList, '/')

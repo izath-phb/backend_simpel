@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_restful import Api, Resource
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from ..models import User, AuditLog, OTP
+from ..models import User, AuditLog, OTP, UserActivityLog
 from bson import ObjectId
 
 auth_bp = Blueprint('auth', __name__)
@@ -50,7 +50,8 @@ class Login(Resource):
                     'rw': user.rw,
                     'is_verified': user.is_verified,
                     'is_email_verified': user.is_email_verified,
-                    'is_face_registered': user.is_face_registered
+                    'is_face_registered': user.is_face_registered,
+                    'phone': user.phone
                 }
             }, 200
         
@@ -99,6 +100,9 @@ class UserManagement(Resource):
                 target=user.name
             ).save()
             
+            if user.role == 'warga':
+                UserActivityLog(user_id=user.id, user_name=user.name, action='LOGIN', target='Mobile App').save()
+
         return {'message': 'User status updated'}, 200
 
 class GoogleLogin(Resource):
@@ -176,7 +180,8 @@ class GoogleLogin(Resource):
                 'is_verified': user.is_verified,
                 'is_email_verified': user.is_email_verified,
                 'photo_url': user.photo_url,
-                'is_face_registered': user.is_face_registered
+                'is_face_registered': user.is_face_registered,
+                'phone': user.phone
             }
         }, 200
 
@@ -510,6 +515,50 @@ class VerifyOTP(Resource):
         
         return {'message': 'Email verified successfully'}, 200
 
+class UserProfile(Resource):
+    @jwt_required()
+    def put(self):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if not user:
+            return {'message': 'User not found'}, 404
+            
+        data = request.get_json() or {}
+        
+        if 'name' in data:
+            user.name = data['name']
+        if 'photo_url' in data:
+            user.photo_url = data['photo_url']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'rt' in data:
+            user.rt = data['rt']
+        if 'rw' in data:
+            user.rw = data['rw']
+            
+        user.save()
+        UserActivityLog(user_id=user.id, user_name=user.name, action='UPDATE_PROFILE', target='Profil Pengguna').save()
+        return {'message': 'Profile updated successfully', 'photo_url': user.photo_url, 'phone': user.phone, 'rt': user.rt, 'rw': user.rw}, 200
+
+class MyActivityLogs(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if not user:
+            return {'message': 'User not found'}, 404
+            
+        logs = UserActivityLog.objects(user_id=user.id).order_by('-timestamp').limit(50)
+        
+        result = [{
+            'id': str(l.id),
+            'action': l.action,
+            'target': l.target,
+            'timestamp': l.timestamp.isoformat()
+        } for l in logs]
+        
+        return {'logs': result}, 200
+
 api.add_resource(Register, '/register')
 api.add_resource(Login, '/login')
 api.add_resource(GoogleLogin, '/google-login')
@@ -518,4 +567,5 @@ api.add_resource(UserManagement, '/users', endpoint='users_list')
 api.add_resource(UserManagement, '/users/<string:user_id>', endpoint='user_detail')
 api.add_resource(SendOTP, '/send-otp')
 api.add_resource(VerifyOTP, '/verify-otp')
-
+api.add_resource(UserProfile, '/profile')
+api.add_resource(MyActivityLogs, '/my-logs')

@@ -1,7 +1,7 @@
 from flask import Blueprint
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models import Report, Project, User, AuditLog
+from ..models import Report, Project, User, AuditLog, UserActivityLog
 from datetime import datetime, timedelta
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -42,12 +42,21 @@ class AdminStats(Resource):
         
         # Recent Audit Logs
         logs = AuditLog.objects().order_by('-timestamp').limit(10)
-        stats['recent_logs'] = [{
-            'admin': l.admin_id.name if l.admin_id else 'System',
-            'action': l.action,
-            'target': l.target,
-            'timestamp': l.timestamp.isoformat()
-        } for l in logs]
+        recent_logs = []
+        for l in logs:
+            try:
+                admin_name = l.admin_id.name if l.admin_id else 'System'
+            except Exception:
+                admin_name = 'System (Deleted)'
+                
+            recent_logs.append({
+                'admin': admin_name,
+                'action': l.action,
+                'target': l.target,
+                'timestamp': l.timestamp.isoformat()
+            })
+            
+        stats['recent_logs'] = recent_logs
         
         return stats, 200
 
@@ -66,5 +75,26 @@ class UserStats(Resource):
         
         return stats, 200
 
+class UserActivityLogsList(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if user.role != 'admin':
+            return {'message': 'Unauthorized'}, 403
+            
+        logs = UserActivityLog.objects().order_by('-timestamp').limit(100)
+        
+        result = [{
+            'id': str(l.id),
+            'user_name': l.user_name or 'Unknown',
+            'action': l.action,
+            'target': l.target,
+            'timestamp': l.timestamp.isoformat()
+        } for l in logs]
+        
+        return {'logs': result}, 200
+
 api.add_resource(AdminStats, '/stats')
 api.add_resource(UserStats, '/user-stats')
+api.add_resource(UserActivityLogsList, '/user-logs')

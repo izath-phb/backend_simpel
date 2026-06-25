@@ -10,6 +10,7 @@ class User(db.Document):
     role = db.StringField(choices=['admin', 'warga'], default='warga')
     rt = db.StringField()
     rw = db.StringField()
+    phone = db.StringField()
     photo_url = db.StringField()
     is_verified = db.BooleanField(default=False)       # Untuk verifikasi pendaftaran
     is_email_verified = db.BooleanField(default=False) # Untuk verifikasi email OTP
@@ -98,3 +99,31 @@ class AuditLog(db.Document):
     action = db.StringField()
     target = db.StringField()
     timestamp = db.DateTimeField(default=datetime.utcnow)
+
+class UserActivityLog(db.Document):
+    meta = {'collection': 'user_activity_logs'}
+    user_id = db.ReferenceField('User', required=True)
+    user_name = db.StringField()
+    action = db.StringField(required=True)
+    target = db.StringField()
+    timestamp = db.DateTimeField(default=datetime.utcnow)
+
+class ChatSession(db.Document):
+    meta = {'collection': 'chat_sessions'}
+    user_id = db.ReferenceField('User', required=True, unique=True)
+    user_name = db.StringField()
+    user_photo_url = db.StringField()
+    last_message = db.StringField()
+    last_sender_role = db.StringField(choices=['admin', 'warga'])
+    unread_admin = db.IntField(default=0)
+    unread_user = db.IntField(default=0)
+    updated_at = db.DateTimeField(default=datetime.utcnow)
+    created_at = db.DateTimeField(default=datetime.utcnow)
+
+class ChatMessage(db.Document):
+    meta = {'collection': 'chat_messages'}
+    session_id = db.ReferenceField(ChatSession, required=True)
+    sender_id = db.ReferenceField('User', required=True)
+    sender_role = db.StringField(choices=['admin', 'warga'])
+    message = db.StringField(required=True)
+    created_at = db.DateTimeField(default=datetime.utcnow)
