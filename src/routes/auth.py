@@ -434,7 +434,34 @@ def send_otp_email(email, code):
     </html>
     """
 
-    if smtp_host and smtp_user and smtp_pass:
+    brevo_api_key = os.environ.get('BREVO_API_KEY')
+    brevo_sender = os.environ.get('BREVO_SENDER_EMAIL', 'admin@simpel.com')
+
+    if brevo_api_key:
+        try:
+            import requests
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": brevo_api_key,
+                "content-type": "application/json"
+            }
+            payload = {
+                "sender": {"name": "SIMPEL Desa", "email": brevo_sender},
+                "to": [{"email": email}],
+                "subject": "SIMPEL - Kode Verifikasi Email OTP",
+                "htmlContent": html_content
+            }
+            response = requests.post(url, json=payload, headers=headers)
+            if response.status_code in [200, 201, 202]:
+                print(f"[BREVO] OTP sent successfully to {email}", flush=True)
+                return True
+            else:
+                print(f"[BREVO ERROR] Failed to send email: {response.text}", flush=True)
+        except Exception as e:
+            print(f"[BREVO ERROR] Exception: {e}", flush=True)
+
+    elif smtp_host and smtp_user and smtp_pass:
         try:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = 'SIMPEL - Kode Verifikasi Email OTP'
