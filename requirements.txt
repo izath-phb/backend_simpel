@@ -22,3 +22,4 @@ flask-bcrypt==1.0.1
 
 gunicorn==21.2.0
 requests==2.31.0
+APScheduler==3.10.4

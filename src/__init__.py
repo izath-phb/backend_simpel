@@ -17,8 +17,23 @@ def create_app():
 
     # Initialize Extensions
     connect(host=mongo_uri)
+    
+    # Connect to bigdata_db
+    try:
+        if 'simpel_db' in mongo_uri:
+            bigdata_uri = mongo_uri.replace('simpel_db', 'bigdata_db')
+        else:
+            bigdata_uri = mongo_uri + '/bigdata_db' if not mongo_uri.endswith('/') else mongo_uri + 'bigdata_db'
+        connect(host=bigdata_uri, alias='bigdata_db')
+    except Exception as e:
+        print(f"Error connecting to bigdata_db: {e}")
+
     jwt.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+    
+    # Start Scheduler
+    from .scheduler import init_scheduler
+    init_scheduler()
 
     # Register Blueprints
     from .routes.auth import auth_bp
@@ -28,6 +43,7 @@ def create_app():
     from .routes.announcements import announcements_bp
     from .routes.upload import upload_bp
     from .routes.chat import chat_bp
+    from .routes.bigdata import bigdata_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(reports_bp, url_prefix='/api/reports')
@@ -36,6 +52,7 @@ def create_app():
     app.register_blueprint(announcements_bp, url_prefix='/api/announcements')
     app.register_blueprint(upload_bp, url_prefix='/api/upload')
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
+    app.register_blueprint(bigdata_bp, url_prefix='/api/bigdata')
     
     # Ensure static uploads dir exists
     os.makedirs(os.path.join(app.root_path, 'static', 'uploads'), exist_ok=True)

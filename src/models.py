@@ -127,3 +127,23 @@ class ChatMessage(db.Document):
     sender_role = db.StringField(choices=['admin', 'warga'])
     message = db.StringField(required=True)
     created_at = db.DateTimeField(default=datetime.utcnow)
+
+class BigDataLog(db.Document):
+    meta = {'collection': 'big_data_logs'}
+    timestamp = db.DateTimeField(default=datetime.utcnow)
+    total_users = db.IntField(default=0)
+    total_reports = db.IntField(default=0)
+    total_projects = db.IntField(default=0)
+    total_bmkg = db.IntField(default=0)
+    total_news = db.IntField(default=0)
+    total_weather = db.IntField(default=0)
+
+class BmkgData(db.Document):
+    meta = {'collection': 'bmkg', 'db_alias': 'bigdata_db'}
+    # Define fields if needed, or leave flexible
+
+class NewsData(db.Document):
+    meta = {'collection': 'news', 'db_alias': 'bigdata_db'}
+
+class WeatherData(db.Document):
+    meta = {'collection': 'weather', 'db_alias': 'bigdata_db'}
