@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from src.models import BigDataLog, User, Report, Project, BmkgData, NewsData, WeatherData
 import datetime
 
@@ -21,8 +21,16 @@ def get_bigdata_stats():
                 'total_weather': WeatherData.objects.count()
             }
             
-        # Get historical data for the line chart (last 24 hours / days)
-        logs = BigDataLog.objects.order_by('-timestamp').limit(24)
+        # Parse time_range
+        time_range = request.args.get('time_range', '24h')
+        limit = 24
+        if time_range == '7d':
+            limit = 24 * 7
+        elif time_range == '30d':
+            limit = 24 * 30
+
+        # Get historical data for the line chart
+        logs = BigDataLog.objects.order_by('-timestamp').limit(limit)
         historical_data = []
         for log in reversed(list(logs)):
             historical_data.append({
@@ -74,3 +82,47 @@ def get_bigdata_stats():
         import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@bigdata_bp.route('/raw', methods=['GET'])
+def get_raw_data():
+    try:
+        source = request.args.get('source', 'news') # news, weather, bmkg
+        search = request.args.get('search', '').lower()
+        limit = int(request.args.get('limit', 50))
+        
+        results = []
+        
+        # Access underlying PyMongo collection to handle dynamic fields easily
+        if source == 'news':
+            coll = NewsData._get_collection()
+        elif source == 'weather':
+            coll = WeatherData._get_collection()
+        elif source == 'bmkg':
+            coll = BmkgData._get_collection()
+        else:
+            return jsonify({'status': 'error', 'message': 'Invalid source'}), 400
+
+        # Build query
+        query = {}
+        if search:
+            query = {'$or': [
+                {'title': {'$regex': search, '$options': 'i'}},
+                {'description': {'$regex': search, '$options': 'i'}},
+                {'city': {'$regex': search, '$options': 'i'}},
+                {'name': {'$regex': search, '$options': 'i'}}
+            ]}
+            
+        cursor = coll.find(query).sort('_id', -1).limit(limit)
+        
+        for doc in cursor:
+            # Clean up ObjectId for JSON serialization
+            doc['_id'] = str(doc['_id'])
+            results.append(doc)
+            
+        return jsonify({'status': 'success', 'data': results}), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
