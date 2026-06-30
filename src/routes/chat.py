@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models import ChatSession, ChatMessage, User
+from ..models import ChatSession, ChatMessage, User, UserActivityLog
 from datetime import datetime
 
 chat_bp = Blueprint('chat', __name__)
@@ -180,6 +180,8 @@ class WargaChatMessages(Resource):
             message=message_text
         )
         message.save()
+        
+        UserActivityLog(user_id=user.id, user_name=user.name, action='SEND_MESSAGE', target='Admin Desa').save()
         
         return {
             'id': str(message.id),

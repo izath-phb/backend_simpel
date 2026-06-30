@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models import Project, User, AuditLog
+from ..models import Project, User, AuditLog, UserActivityLog
 from datetime import datetime
 
 projects_bp = Blueprint('projects', __name__)
@@ -114,10 +114,12 @@ class ProjectFollowToggle(Resource):
             for u in project.followers:
                 if str(u.id) == str(user.id):
                     project.followers.remove(u)
+                    UserActivityLog(user_id=user.id, user_name=user.name, action='UNFOLLOW_PROJECT', target=project.title).save()
                     break
             message = 'Unfollowed'
         else:
             project.followers.append(user)
+            UserActivityLog(user_id=user.id, user_name=user.name, action='FOLLOW_PROJECT', target=project.title).save()
             message = 'Followed'
             is_following = True
             

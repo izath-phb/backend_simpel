@@ -27,6 +27,8 @@ class Register(Resource):
         user.set_password(data.get('password'))
         user.save()
         
+        UserActivityLog(user_id=user.id, user_name=user.name, action='REGISTER', target='Sistem').save()
+        
         return {'message': 'User created successfully and is now active.'}, 201
 
 class Login(Resource):
@@ -39,6 +41,10 @@ class Login(Resource):
                 return {'message': 'Your account has been blocked. Please contact admin.'}, 403
                 
             access_token = create_access_token(identity=str(user.id))
+            
+            if user.role == 'warga':
+                UserActivityLog(user_id=user.id, user_name=user.name, action='LOGIN', target='Mobile App').save()
+                
             return {
                 'access_token': access_token,
                 'user': {
@@ -168,6 +174,10 @@ class GoogleLogin(Resource):
             return {'message': 'Your account has been blocked. Please contact admin.'}, 403
             
         access_token = create_access_token(identity=str(user.id))
+        
+        if user.role == 'warga':
+            UserActivityLog(user_id=user.id, user_name=user.name, action='LOGIN', target='Mobile App').save()
+            
         return {
             'access_token': access_token,
             'user': {
@@ -222,6 +232,8 @@ class VerifyFace(Resource):
                 user.face_embedding = new_embedding
                 user.is_face_registered = True
                 user.save()
+                
+                UserActivityLog(user_id=user.id, user_name=user.name, action='REGISTER_FACE', target='Sistem').save()
 
                 return {
                     'status': 'success',
@@ -246,6 +258,8 @@ class VerifyFace(Resource):
                     # Simpan embedding baru dan anggap berhasil
                     user.face_embedding = new_embedding
                     user.save()
+                    
+                    UserActivityLog(user_id=user.id, user_name=user.name, action='REGISTER_FACE', target='Sistem').save()
                     return {
                         'status': 'success',
                         'verified': True,
@@ -263,6 +277,9 @@ class VerifyFace(Resource):
                 # Bandingkan embedding baru vs embedding tersimpan
                 result = compare_embeddings(user.face_embedding, new_embedding)
                 processing_time = int((time.time() - start_time) * 1000)
+                
+                if result['verified']:
+                    UserActivityLog(user_id=user.id, user_name=user.name, action='VERIFY_FACE', target='Sistem').save()
 
                 return {
                     'status': 'success' if result['verified'] else 'failed',
@@ -306,6 +323,9 @@ class VerifyFace(Resource):
             if is_registration_mode and user_id:
                 user.is_face_registered = True
                 user.save()
+                UserActivityLog(user_id=user.id, user_name=user.name, action='REGISTER_FACE', target='Sistem').save()
+            elif user_id:
+                UserActivityLog(user_id=user.id, user_name=user.name, action='VERIFY_FACE', target='Sistem').save()
 
             return {
                 'status': 'success',
@@ -536,6 +556,8 @@ class VerifyOTP(Resource):
         if user:
             user.is_email_verified = True
             user.save()
+            
+            UserActivityLog(user_id=user.id, user_name=user.name, action='VERIFY_EMAIL', target='Sistem').save()
             
         # Delete verified OTP
         otp.delete()
