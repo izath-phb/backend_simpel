@@ -38,17 +38,19 @@ def get_bigdata_stats():
                 'volume': log.total_users + log.total_reports + log.total_bmkg + log.total_news + log.total_weather,
                 'bmkg': log.total_bmkg,
                 'news': log.total_news,
-                'weather': log.total_weather
+                'weather': log.total_weather,
+                'users': log.total_users,
+                'reports': log.total_reports
             })
             
         # Add dummy data if history is empty to make chart visible
         if not historical_data:
             historical_data = [
-                {'time': '08:00', 'volume': 150, 'bmkg': 20, 'news': 50, 'weather': 10},
-                {'time': '09:00', 'volume': 200, 'bmkg': 25, 'news': 55, 'weather': 12},
-                {'time': '10:00', 'volume': 180, 'bmkg': 30, 'news': 60, 'weather': 15},
-                {'time': '11:00', 'volume': 220, 'bmkg': 35, 'news': 65, 'weather': 20},
-                {'time': '12:00', 'volume': 250, 'bmkg': 40, 'news': 70, 'weather': 25},
+                {'time': '08:00', 'volume': 150, 'bmkg': 20, 'news': 50, 'weather': 10, 'users': 100, 'reports': 30},
+                {'time': '09:00', 'volume': 200, 'bmkg': 25, 'news': 55, 'weather': 12, 'users': 105, 'reports': 35},
+                {'time': '10:00', 'volume': 180, 'bmkg': 30, 'news': 60, 'weather': 15, 'users': 110, 'reports': 40},
+                {'time': '11:00', 'volume': 220, 'bmkg': 35, 'news': 65, 'weather': 20, 'users': 115, 'reports': 45},
+                {'time': '12:00', 'volume': 250, 'bmkg': 40, 'news': 70, 'weather': 25, 'users': 120, 'reports': 50},
             ]
 
         # Calculate proportions for Pie Chart (Capstore vs External)
@@ -62,16 +64,15 @@ def get_bigdata_stats():
                 'total_external': total_external,
                 'total_combined': total_capstore + total_external
             },
-            'bar_chart': [
+            'internal_bar_chart': [
                 {'name': 'Users', 'value': latest_log.total_users if isinstance(latest_log, BigDataLog) else latest_log['total_users']},
                 {'name': 'Reports', 'value': latest_log.total_reports if isinstance(latest_log, BigDataLog) else latest_log['total_reports']},
-                {'name': 'BMKG', 'value': latest_log.total_bmkg if isinstance(latest_log, BigDataLog) else latest_log['total_bmkg']},
-                {'name': 'News', 'value': latest_log.total_news if isinstance(latest_log, BigDataLog) else latest_log['total_news']},
-                {'name': 'Weather', 'value': latest_log.total_weather if isinstance(latest_log, BigDataLog) else latest_log['total_weather']},
+                {'name': 'Projects', 'value': latest_log.total_projects if isinstance(latest_log, BigDataLog) else latest_log['total_projects']},
             ],
-            'pie_chart': [
-                {'name': 'Aplikasi Capstore', 'value': total_capstore, 'color': '#6366f1'},
-                {'name': 'External Big Data', 'value': total_external, 'color': '#10b981'}
+            'external_pie_chart': [
+                {'name': 'BMKG', 'value': latest_log.total_bmkg if isinstance(latest_log, BigDataLog) else latest_log['total_bmkg'], 'color': '#f59e0b'},
+                {'name': 'News', 'value': latest_log.total_news if isinstance(latest_log, BigDataLog) else latest_log['total_news'], 'color': '#ec4899'},
+                {'name': 'Weather', 'value': latest_log.total_weather if isinstance(latest_log, BigDataLog) else latest_log['total_weather'], 'color': '#06b6d4'},
             ],
             'line_chart': historical_data
         }
