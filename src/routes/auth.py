@@ -608,6 +608,24 @@ class MyActivityLogs(Resource):
         
         return {'logs': result}, 200
 
+class FCMTokenUpdate(Resource):
+    @jwt_required()
+    def post(self):
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        fcm_token = data.get('fcm_token')
+        
+        if not fcm_token:
+            return {'message': 'fcm_token is required'}, 400
+            
+        user = User.objects(id=user_id).first()
+        if user:
+            user.fcm_token = fcm_token
+            user.save()
+            return {'message': 'FCM token updated successfully'}, 200
+        return {'message': 'User not found'}, 404
+
+
 api.add_resource(Register, '/register')
 api.add_resource(Login, '/login')
 api.add_resource(GoogleLogin, '/google-login')
