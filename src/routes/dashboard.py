@@ -25,8 +25,8 @@ class AdminStats(Resource):
             'resolved_reports': Report.objects(status='resolved').count(),
             'reports_today': Report.objects(created_at__gte=today).count(),
             'total_projects': Project.objects.count(),
-            'total_budget': sum(p.budget for p in Project.objects),
-            'avg_progress': sum(p.progress for p in Project.objects) / max(Project.objects.count(), 1),
+            'total_budget': sum((p.budget or 0) for p in Project.objects),
+            'avg_progress': sum((p.progress or 0) for p in Project.objects) / max(Project.objects.count(), 1),
             'blocked_users': User.objects(is_verified=False, role='warga').count()
         }
         
