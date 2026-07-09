@@ -1,8 +1,9 @@
 from flask import Blueprint, request
 from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from ..models import Project, User, AuditLog, UserActivityLog
+from ..models import Project, User, AuditLog, UserActivityLog, Notification
 from datetime import datetime
+from ..utils.fcm import send_push_notification
 
 projects_bp = Blueprint('projects', __name__)
 api = Api(projects_bp)
@@ -78,6 +79,30 @@ class ProjectDetail(Resource):
         
         project.save()
         AuditLog(admin_id=user_id, action='UPDATE_PROJECT', target=project.title).save()
+        
+        # Notify followers
+        if project.followers:
+            title = "Update Proyek: " + project.title
+            body = f"Ada pembaruan pada proyek yang Anda ikuti. Progres saat ini: {project.progress}%."
+            data = {"type": "project_update", "project_id": str(project.id)}
+            
+            for follower in project.followers:
+                # Resolve the reference if it's lazily loaded
+                follower_user = follower if isinstance(follower, User) else User.objects(id=follower.id).first()
+                if not follower_user:
+                    continue
+                    
+                # Create in-app notification
+                Notification(
+                    user_id=follower_user.id,
+                    title=title,
+                    body=body,
+                    data=data
+                ).save()
+                
+                # Send push notification
+                if follower_user.fcm_token:
+                    send_push_notification(follower_user.fcm_token, title, body, data)
         
         return {'message': 'Project updated'}, 200
 

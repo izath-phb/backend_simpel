@@ -16,6 +16,7 @@ class User(db.Document):
     is_email_verified = db.BooleanField(default=False) # Untuk verifikasi email OTP
     is_face_registered = db.BooleanField(default=False) # Status perekaman wajah
     face_embedding = db.ListField(db.FloatField())      # Embedding FaceNet 128-dimensi
+    fcm_token = db.StringField()                        # Untuk push notification Firebase
     created_at = db.DateTimeField(default=datetime.utcnow)
 
 
@@ -147,3 +148,12 @@ class NewsData(db.Document):
 
 class WeatherData(db.Document):
     meta = {'collection': 'weather', 'db_alias': 'bigdata_db'}
+
+class Notification(db.Document):
+    meta = {'collection': 'notifications'}
+    user_id = db.ReferenceField('User', required=True)
+    title = db.StringField(required=True)
+    body = db.StringField(required=True)
+    data = db.DictField()
+    is_read = db.BooleanField(default=False)
+    created_at = db.DateTimeField(default=datetime.utcnow)
