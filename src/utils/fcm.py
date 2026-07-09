@@ -49,6 +49,13 @@ def send_push_notification(token, title, body, data=None):
                 title=title,
                 body=body,
             ),
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='high_importance_channel',
+                    sound='default'
+                )
+            ),
             data=data or {},
             token=token,
         )
