@@ -3,9 +3,26 @@ from flask_restful import Api, Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..models import Report, Project, User, AuditLog, UserActivityLog
 from datetime import datetime, timedelta
+from ..utils.fcm import send_push_notification
 
 dashboard_bp = Blueprint('dashboard', __name__)
 api = Api(dashboard_bp)
+
+class TestPush(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if not user.fcm_token:
+            return {'message': 'No FCM token'}, 400
+            
+        success = send_push_notification(
+            user.fcm_token,
+            "Test Notifikasi",
+            "Ini adalah pesan uji coba dari backend",
+            {"type": "test"}
+        )
+        return {'success': success, 'token': user.fcm_token}, 200
 
 class AdminStats(Resource):
     @jwt_required()
@@ -98,3 +115,4 @@ class UserActivityLogsList(Resource):
 api.add_resource(AdminStats, '/stats')
 api.add_resource(UserStats, '/user-stats')
 api.add_resource(UserActivityLogsList, '/user-logs')
+api.add_resource(TestPush, '/test-push')
