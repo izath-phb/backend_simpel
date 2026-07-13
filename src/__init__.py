@@ -133,4 +133,16 @@ def create_app():
         from flask import Response
         return Response(html_content, mimetype='text/html')
 
+    # Register GraphQL endpoint
+    from flask_graphql import GraphQLView
+    from .graphql_schema import schema
+    app.add_url_rule(
+        '/graphql',
+        view_func=GraphQLView.as_view(
+            'graphql',
+            schema=schema,
+            graphiql=True
+        )
+    )
+
     return app
