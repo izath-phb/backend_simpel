@@ -134,15 +134,53 @@ def create_app():
         return Response(html_content, mimetype='text/html')
 
     # Register GraphQL endpoint
-    from flask_graphql import GraphQLView
+    from flask import request, jsonify, render_template_string
     from .graphql_schema import schema
-    app.add_url_rule(
-        '/graphql',
-        view_func=GraphQLView.as_view(
-            'graphql',
-            schema=schema,
-            graphiql=True
+    
+    @app.route('/graphql', methods=['GET', 'POST'])
+    def graphql_endpoint():
+        if request.method == 'GET':
+            html = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <style>body { margin: 0; padding: 0; height: 100vh; overflow: hidden; }</style>
+                <link rel="stylesheet" href="https://unpkg.com/graphiql/graphiql.min.css" />
+                <script crossorigin src="https://unpkg.com/react/umd/react.production.min.js"></script>
+                <script crossorigin src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+                <script crossorigin src="https://unpkg.com/graphiql/graphiql.min.js"></script>
+              </head>
+              <body>
+                <div id="graphiql" style="height: 100vh;"></div>
+                <script>
+                  const fetcher = GraphiQL.createFetcher({url: '/graphql'});
+                  ReactDOM.render(
+                    React.createElement(GraphiQL, { fetcher: fetcher }),
+                    document.getElementById('graphiql'),
+                  );
+                </script>
+              </body>
+            </html>
+            """
+            return render_template_string(html)
+            
+        data = request.get_json()
+        if not data:
+            return jsonify({'errors': [{'message': 'No JSON data provided'}]}), 400
+            
+        result = schema.execute(
+            data.get('query'),
+            variable_values=data.get('variables'),
+            operation_name=data.get('operationName')
         )
-    )
+        
+        response = {}
+        if result.errors:
+            response['errors'] = [{'message': str(e)} for e in result.errors]
+        if result.data is not None:
+            response['data'] = result.data
+            
+        return jsonify(response), 200
+
 
     return app
